@@ -19,7 +19,7 @@ constexpr double const YerhoE2a = 1.52588e-4;
 //   E (GeV) positive for neutrinos, negative for antineutrinos
 //   rho (g/cc)
 //   Ye: electron fraction, typically around 0.5
-//   N_Newton: number of Newton's method iterations to do. should be zero, one, two (or higher)
+//   N_Newton: number of Newton's method iterations to do. should be zero, one, two (or higher); if negative, use exact expression
 // Outputs:
 //   probs_returned is all nine oscillation probabilities: e.g. probs_returned[1][0] is mu->e
 void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, double E, double rho, double Ye, int N_Newton, double (*probs_returned)[3][3])
@@ -28,6 +28,7 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	double Ue1sq, Ue2sq, Ue3sq, Um1sq, Um2sq, Um3sq, Ut1sq, Ut2sq, Ut3sq;
 	double A, B, C;
 	double See, Tee, Smm, Tmm;
+	double rootAsqB, ss0;
 	double xmat, lambda2, lambda3, Dlambda21, Dlambda31, Dlambda32;
 	double Xp2, Xp3, PiDlambdaInv, tmp;
 	double Lover4E, D21, D32;
@@ -67,19 +68,35 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	C = Amatter * Tee;
 	A = A + Amatter;
 
-	// ---------------------------------- //
-	// Get lambda3 from lambda+ of MP/DMP //
-	// ---------------------------------- //
-	xmat = Amatter / Dmsqee;
-	tmp = 1 - xmat;
-	lambda3 = Dmsq31 + 0.5 * Dmsqee * (xmat - 1 + sqrt(tmp * tmp + 4 * s13sq * xmat));
+	if (N_Newton < 0)
+	{
+		// ------------------------------------------- //
+		// Get lambda3 from ZS, computationally costly //
+		// Lambda3 for both mass orderings			 //
+		// ------------------------------------------- //
+		B = Tmm + Amatter * See; // B is only needed for N_Newton != 1
+		rootAsqB = sqrt(A * A - 3. * B);
+		ss0 = acos((A * A * A - 4.5 * A * B + 13.5 * C) / (rootAsqB * rootAsqB * rootAsqB));
+		if (Dmsq31 < 0.)
+			ss0 = ss0 + 2. * M_PI; //  add 2Pi if Dmsq31 < 0 to get lambda3
+		lambda3 = (A + 2. * rootAsqB * cos(ss0 / 3.)) / 3.;
+	}
+	else
+	{
+		// ---------------------------------- //
+		// Get lambda3 from lambda+ of MP/DMP //
+		// ---------------------------------- //
+		xmat = Amatter / Dmsqee;
+		tmp = 1 - xmat;
+		lambda3 = Dmsq31 + 0.5 * Dmsqee * (xmat - 1 + sqrt(tmp * tmp + 4 * s13sq * xmat));
 
-	// ---------------------------------------------------------------------------- //
-	// Newton iterations to improve lambda3 arbitrarily, if needed, (B needed here) //
-	// ---------------------------------------------------------------------------- //
-	B = Tmm + Amatter * See; // B is only needed for N_Newton >= 1
-	for (int i = 0; i < N_Newton; i++)
-		lambda3 = (lambda3 * lambda3 * (lambda3 + lambda3 - A) + C) / (lambda3 * (2 * (lambda3 - A) + lambda3) + B); // this strange form prefers additions to multiplications
+		// ---------------------------------------------------------------------------- //
+		// Newton iterations to improve lambda3 arbitrarily, if needed, (B needed here) //
+		// ---------------------------------------------------------------------------- //
+		B = Tmm + Amatter * See; // B is only needed for N_Newton != 1
+		for (int i = 0; i < N_Newton; i++)
+			lambda3 = (lambda3 * lambda3 * (lambda3 + lambda3 - A) + C) / (lambda3 * (2 * (lambda3 - A) + lambda3) + B); // this strange form prefers additions to multiplications
+	}
 
 	// ------------------- //
 	// Get  Delta lambda's //
