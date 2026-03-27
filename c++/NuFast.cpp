@@ -72,7 +72,7 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	{
 		// ------------------------------------------- //
 		// Get lambda3 from ZS, computationally costly //
-		// Lambda3 for both mass orderings			 //
+		// Lambda3 for both mass orderings             //
 		// ------------------------------------------- //
 		B = Tmm + Amatter * See; // B is only needed for N_Newton != 1
 		rootAsqB = sqrt(A * A - 3. * B);
