@@ -32,35 +32,61 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	double sinsqD21_2, sinsqD31_2, sinsqD32_2, triple_sin;
 	double Pme_CPC, Pme_CPV, Pmm, Pee;
 
-	// --------------------------------------------------------------------- //
-	// First calculate useful simple functions of the oscillation parameters //
-	// --------------------------------------------------------------------- //
-	c13sq = 1 - s13sq;
+	// Cache of quantities that depend only on the oscillation parameters
+	// (s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31). On repeated calls with
+	// the same parameters but varying E/L/rho/Ye, this avoids recomputing
+	// sin/cos/sqrt and ~20 multiplications per call.
+	thread_local double cm_s12sq = -1, cm_s13sq = -1, cm_s23sq = -1, cm_delta = -1;
+	thread_local double cm_Dmsq21 = -1, cm_Dmsq31 = -1;
+	thread_local double cm_Ue2sq, cm_Ue3sq, cm_Um2sq, cm_Um3sq;
+	thread_local double cm_Jmatter, cm_Dmsqee, cm_A, cm_See, cm_Tmm, cm_Tee;
 
-	// Ueisq's
-	Ue2sq = c13sq * s12sq;
-	Ue3sq = s13sq;
+	if (s12sq != cm_s12sq || s13sq != cm_s13sq || s23sq != cm_s23sq || delta != cm_delta
+	    || Dmsq21 != cm_Dmsq21 || Dmsq31 != cm_Dmsq31)
+	{
+		// --------------------------------------------------------------------- //
+		// First calculate useful simple functions of the oscillation parameters //
+		// --------------------------------------------------------------------- //
+		c13sq = 1 - s13sq;
 
-	// Umisq's, Utisq's and Jvac	 
-	Um3sq = c13sq * s23sq;
-	// Um2sq and Ut2sq are used here as temporary variables, will be properly defined later	 
-	Ut2sq = s13sq * s12sq * s23sq;
-	Um2sq = (1 - s12sq) * (1 - s23sq);
+		// Ueisq's
+		Ue2sq = c13sq * s12sq;
+		Ue3sq = s13sq;
 
-	Jrr = sqrt(Um2sq * Ut2sq);
-	sind = sin(delta);
-	cosd = cos(delta);
+		// Umisq's, Utisq's and Jvac
+		Um3sq = c13sq * s23sq;
+		// Um2sq and Ut2sq are used here as temporary variables, will be properly defined later
+		Ut2sq = s13sq * s12sq * s23sq;
+		Um2sq = (1 - s12sq) * (1 - s23sq);
 
-	Um2sq = Um2sq + Ut2sq - 2 * Jrr * cosd;
-	Jmatter = 8 * Jrr * c13sq * sind;
+		Jrr = sqrt(Um2sq * Ut2sq);
+		sind = sin(delta);
+		cosd = cos(delta);
+
+		Um2sq = Um2sq + Ut2sq - 2 * Jrr * cosd;
+		Jmatter = 8 * Jrr * c13sq * sind;
+		Dmsqee = Dmsq31 - s12sq * Dmsq21;
+
+		// calculate A, See, Tee (E-independent parts)
+		A = Dmsq21 + Dmsq31; // temporary variable (= A_vac, becomes full A below)
+		See = A - Dmsq21 * Ue2sq - Dmsq31 * Ue3sq;
+		Tmm = Dmsq21 * Dmsq31; // using Tmm as a temporary variable
+		Tee = Tmm * (1 - Ue3sq - Ue2sq);
+
+		cm_s12sq = s12sq; cm_s13sq = s13sq; cm_s23sq = s23sq; cm_delta = delta;
+		cm_Dmsq21 = Dmsq21; cm_Dmsq31 = Dmsq31;
+		cm_Ue2sq = Ue2sq; cm_Ue3sq = Ue3sq; cm_Um2sq = Um2sq; cm_Um3sq = Um3sq;
+		cm_Jmatter = Jmatter; cm_Dmsqee = Dmsqee;
+		cm_A = A; cm_See = See; cm_Tmm = Tmm; cm_Tee = Tee;
+	}
+	else
+	{
+		Ue2sq = cm_Ue2sq; Ue3sq = cm_Ue3sq; Um2sq = cm_Um2sq; Um3sq = cm_Um3sq;
+		Jmatter = cm_Jmatter; Dmsqee = cm_Dmsqee;
+		A = cm_A; See = cm_See; Tmm = cm_Tmm; Tee = cm_Tee;
+	}
+
 	Amatter = Ye * rho * E * YerhoE2a;
-	Dmsqee = Dmsq31 - s12sq * Dmsq21;
-
-	// calculate A, B, C, See, Tee, and part of Tmm
-	A = Dmsq21 + Dmsq31; // temporary variable
-	See = A - Dmsq21 * Ue2sq - Dmsq31 * Ue3sq;
-	Tmm = Dmsq21 * Dmsq31; // using Tmm as a temporary variable	  
-	Tee = Tmm * (1 - Ue3sq - Ue2sq);
 	C = Amatter * Tee;
 	A = A + Amatter;
 
@@ -179,36 +205,57 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 	double sinsqD21_2, sinsqD31_2, sinsqD32_2, triple_sin;
 	double Pme_CPC, Pme_CPV, Pmm, Pee;
 
-	// --------------------------------------------------------------------- //
-	// First calculate useful simple functions of the oscillation parameters //
-	// --------------------------------------------------------------------- //
-	c13sq = 1 - s13sq;
+	// Cache of quantities that depend only on the mixing angles (s12sq, s13sq,
+	// s23sq, delta). On repeated calls with the same angles but varying E/L/Dmsqij,
+	// this avoids recomputing sin/cos/sqrt.
+	thread_local double cv_s12sq = -1, cv_s13sq = -1, cv_s23sq = -1, cv_delta = -1;
+	thread_local double cv_Ue1sq, cv_Ue2sq, cv_Ue3sq, cv_Um1sq, cv_Um2sq, cv_Um3sq;
+	thread_local double cv_Ut1sq, cv_Ut2sq, cv_Ut3sq, cv_Jvac;
 
-	// Ueisq's
-	Ue3sq = s13sq;
-	Ue2sq = c13sq * s12sq;
+	if (s12sq != cv_s12sq || s13sq != cv_s13sq || s23sq != cv_s23sq || delta != cv_delta)
+	{
+		// --------------------------------------------------------------------- //
+		// First calculate useful simple functions of the oscillation parameters //
+		// --------------------------------------------------------------------- //
+		c13sq = 1 - s13sq;
 
-	// Umisq's, Utisq's and Jvac	 
-	Um3sq = c13sq * s23sq;
-	// Um2sq and Ut2sq are used here as temporary variables, will be properly defined later	 
-	Ut2sq = s13sq * s12sq * s23sq;
-	Um2sq = (1 - s12sq) * (1 - s23sq);
-	  
-	Jrr = sqrt(Um2sq * Ut2sq);
-	sind = sin(delta);
-	cosd = cos(delta);
-	Um2sq = Um2sq + Ut2sq - 2 * Jrr * cosd;
-	Jvac = 8 * Jrr * c13sq * sind;
-	
-	// ----------------------- //
-	// Get all elements of Usq //
-	// ----------------------- //
-	Ue1sq = 1 - Ue3sq - Ue2sq;
-	Um1sq = 1 - Um3sq - Um2sq;
+		// Ueisq's
+		Ue3sq = s13sq;
+		Ue2sq = c13sq * s12sq;
 
-	Ut3sq = 1 - Um3sq - Ue3sq;
-	Ut2sq = 1 - Um2sq - Ue2sq;
-	Ut1sq = 1 - Um1sq - Ue1sq;
+		// Umisq's, Utisq's and Jvac
+		Um3sq = c13sq * s23sq;
+		// Um2sq and Ut2sq are used here as temporary variables, will be properly defined later
+		Ut2sq = s13sq * s12sq * s23sq;
+		Um2sq = (1 - s12sq) * (1 - s23sq);
+
+		Jrr = sqrt(Um2sq * Ut2sq);
+		sind = sin(delta);
+		cosd = cos(delta);
+		Um2sq = Um2sq + Ut2sq - 2 * Jrr * cosd;
+		Jvac = 8 * Jrr * c13sq * sind;
+
+		// ----------------------- //
+		// Get all elements of Usq //
+		// ----------------------- //
+		Ue1sq = 1 - Ue3sq - Ue2sq;
+		Um1sq = 1 - Um3sq - Um2sq;
+
+		Ut3sq = 1 - Um3sq - Ue3sq;
+		Ut2sq = 1 - Um2sq - Ue2sq;
+		Ut1sq = 1 - Um1sq - Ue1sq;
+
+		cv_s12sq = s12sq; cv_s13sq = s13sq; cv_s23sq = s23sq; cv_delta = delta;
+		cv_Ue1sq = Ue1sq; cv_Ue2sq = Ue2sq; cv_Ue3sq = Ue3sq;
+		cv_Um1sq = Um1sq; cv_Um2sq = Um2sq; cv_Um3sq = Um3sq;
+		cv_Ut1sq = Ut1sq; cv_Ut2sq = Ut2sq; cv_Ut3sq = Ut3sq; cv_Jvac = Jvac;
+	}
+	else
+	{
+		Ue1sq = cv_Ue1sq; Ue2sq = cv_Ue2sq; Ue3sq = cv_Ue3sq;
+		Um1sq = cv_Um1sq; Um2sq = cv_Um2sq; Um3sq = cv_Um3sq;
+		Ut1sq = cv_Ut1sq; Ut2sq = cv_Ut2sq; Ut3sq = cv_Ut3sq; Jvac = cv_Jvac;
+	}
 
 	// ----------------------- //
 	// Get the kinematic terms //
