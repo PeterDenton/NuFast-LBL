@@ -1,6 +1,10 @@
 #include <cmath>
 #include <stdio.h>
 
+#include <vector>
+
+using namespace std;
+
 // Some constants
 constexpr double const eVsqkm_to_GeV_over4 = 1e-9 / 1.97327e-7 * 1e3 / 4;
 constexpr double const YerhoE2a = 1.52588e-4;
@@ -16,18 +20,19 @@ constexpr double const YerhoE2a = 1.52588e-4;
 //   phase (usual parameterization) make Dmsq31 positive/negative for the NO/IO
 //   Delta msq's (eV^2)
 //   L (km)
-//   E (GeV) positive for neutrinos, negative for antineutrinos
-//   rho (g/cc)
+//   nE: number of energy points to compute
+//   E (GeV) positive for neutrinos, negative for antineutrinos. Array
+//   rhoYe density (g/cc) times electron fraction, typically around 0.5
 //   Ye: electron fraction, typically around 0.5
 //   N_Newton: number of Newton's method iterations to do. should be zero, one, two (or higher); if negative, use exact expression
 // Outputs:
 //   probs_returned is all nine oscillation probabilities: e.g. probs_returned[1][0] is mu->e
-void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, double E, double rho, double Ye, int N_Newton, double (*probs_returned)[3][3])
+void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int N_Newton, vector<double[3][3]> *probs_returned)
 {
-	double c13sq, sind, cosd, Jrr, Jmatter, Dmsqee, Amatter;
-	double Ue1sq, Ue2sq, Ue3sq, Um1sq, Um2sq, Um3sq, Ut1sq, Ut2sq, Ut3sq;
-	double A, B, C;
-	double See, Tee, Smm, Tmm;
+	double c13sq, sind, cosd, Jrr, Jmatter, Jmatter_tmp, Dmsqee, Amatter;
+	double Ue1sq, Ue2sq, Ue2sq_tmp, Ue3sq, Ue3sq_tmp, Um1sq, Um2sq, Um2sq_tmp, Um3sq, Um3sq_tmp,Ut1sq, Ut2sq, Ut2sq_tmp, Ut3sq;
+	double A, A_tmp, B, C;
+	double See, Tee, Smm, Tmm, Tmm_tmp;
 	double rootAsqB, ss0;
 	double xmat, lambda2, lambda3, Dlambda21, Dlambda31, Dlambda32;
 	double Xp2, Xp3, PiDlambdaInv, tmp;
@@ -42,155 +47,159 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	c13sq = 1 - s13sq;
 
 	// Ueisq's
-	Ue2sq = c13sq * s12sq;
-	Ue3sq = s13sq;
+	Ue2sq_tmp = c13sq * s12sq;
+	Ue3sq_tmp = s13sq;
 
 	// Umisq's, Utisq's and Jvac	 
-	Um3sq = c13sq * s23sq;
-	// Um2sq and Ut2sq are used here as temporary variables, will be properly defined later	 
-	Ut2sq = s13sq * s12sq * s23sq;
-	Um2sq = (1 - s12sq) * (1 - s23sq);
+	Um3sq_tmp = c13sq * s23sq;
+	// Um2sq_tmp and Ut2sq_tmp are used here as temporary variables, will be properly defined later	 
+	Ut2sq_tmp = s13sq * s12sq * s23sq;
+	Um2sq_tmp = (1 - s12sq) * (1 - s23sq);
 
-	Jrr = sqrt(Um2sq * Ut2sq);
+	Jrr = sqrt(Um2sq_tmp * Ut2sq_tmp);
 	sind = sin(delta);
 	cosd = cos(delta);
 
-	Um2sq = Um2sq + Ut2sq - 2 * Jrr * cosd;
-	Jmatter = 8 * Jrr * c13sq * sind;
-	Amatter = Ye * rho * E * YerhoE2a;
+	Um2sq_tmp += Ut2sq_tmp - 2 * Jrr * cosd;
+	Jmatter_tmp = 8 * Jrr * c13sq * sind;
 	Dmsqee = Dmsq31 - s12sq * Dmsq21;
 
 	// calculate A, B, C, See, Tee, and part of Tmm
-	A = Dmsq21 + Dmsq31; // temporary variable
-	See = A - Dmsq21 * Ue2sq - Dmsq31 * Ue3sq;
-	Tmm = Dmsq21 * Dmsq31; // using Tmm as a temporary variable	  
-	Tee = Tmm * (1 - Ue3sq - Ue2sq);
-	C = Amatter * Tee;
-	A = A + Amatter;
+	A_tmp = Dmsq21 + Dmsq31; // temporary variable
+	See = A_tmp - Dmsq21 * Ue2sq_tmp - Dmsq31 * Ue3sq_tmp;
+	Tmm_tmp = Dmsq21 * Dmsq31; // using Tmm as a temporary variable	  
+	Tee = Tmm_tmp * (1 - Ue3sq_tmp - Ue2sq_tmp);
 
-	if (N_Newton < 0)
+	for (int i = 0; i < E.size(); i++)
 	{
-		// ------------------------------------------- //
-		// Get lambda3 from ZS, computationally costly //
-		// Lambda3 for both mass orderings             //
-		// ------------------------------------------- //
-		B = Tmm + Amatter * See; // B is only needed for N_Newton != 1
-		rootAsqB = sqrt(A * A - 3. * B);
-		ss0 = acos((A * A * A - 4.5 * A * B + 13.5 * C) / (rootAsqB * rootAsqB * rootAsqB));
-		if (Dmsq31 < 0.)
-			ss0 = ss0 + 2. * M_PI; //  add 2Pi if Dmsq31 < 0 to get lambda3
-		lambda3 = (A + 2. * rootAsqB * cos(ss0 / 3.)) / 3.;
-	}
-	else
-	{
-		// ---------------------------------- //
-		// Get lambda3 from lambda+ of MP/DMP //
-		// ---------------------------------- //
-		xmat = Amatter / Dmsqee;
-		tmp = 1 - xmat;
-		lambda3 = Dmsq31 + 0.5 * Dmsqee * (xmat - 1 + sqrt(tmp * tmp + 4 * s13sq * xmat));
+		Amatter = rhoYe * E[i] * YerhoE2a;
+		C = Amatter * Tee;
+		A = A_tmp + Amatter;
 
-		// ---------------------------------------------------------------------------- //
-		// Newton iterations to improve lambda3 arbitrarily, if needed, (B needed here) //
-		// ---------------------------------------------------------------------------- //
-		B = Tmm + Amatter * See; // B is only needed for N_Newton != 1
-		for (int i = 0; i < N_Newton; i++)
-			lambda3 = (lambda3 * lambda3 * (lambda3 + lambda3 - A) + C) / (lambda3 * (2 * (lambda3 - A) + lambda3) + B); // this strange form prefers additions to multiplications
-	}
+		if (N_Newton < 0)
+		{
+			// ------------------------------------------- //
+			// Get lambda3 from ZS, computationally costly //
+			// Lambda3 for both mass orderings             //
+			// ------------------------------------------- //
+			B = Tmm_tmp + Amatter * See; // B is only needed for N_Newton != 1
+			rootAsqB = sqrt(A * A - 3. * B);
+			ss0 = acos((A * A * A - 4.5 * A * B + 13.5 * C) / (rootAsqB * rootAsqB * rootAsqB));
+			if (Dmsq31 < 0.)
+				ss0 = ss0 + 2. * M_PI; //  add 2Pi if Dmsq31 < 0 to get lambda3
+			lambda3 = (A + 2. * rootAsqB * cos(ss0 / 3.)) / 3.;
+		}
+		else
+		{
+			// ---------------------------------- //
+			// Get lambda3 from lambda+ of MP/DMP //
+			// ---------------------------------- //
+			xmat = Amatter / Dmsqee;
+			tmp = 1 - xmat;
+			lambda3 = Dmsq31 + 0.5 * Dmsqee * (xmat - 1 + sqrt(tmp * tmp + 4 * s13sq * xmat));
 
-	// ------------------- //
-	// Get  Delta lambda's //
-	// ------------------- //
-	tmp = A - lambda3;
-	Dlambda21 = sqrt(tmp * tmp - 4 * C / lambda3);
-	lambda2 = 0.5 * (A - lambda3 + Dlambda21);
-	Dlambda32 = lambda3 - lambda2;
-	Dlambda31 = Dlambda32 + Dlambda21;
+			// ---------------------------------------------------------------------------- //
+			// Newton iterations to improve lambda3 arbitrarily, if needed, (B needed here) //
+			// ---------------------------------------------------------------------------- //
+			B = Tmm_tmp + Amatter * See; // B is only needed for N_Newton != 1
+			for (int j = 0; j < N_Newton; j++)
+				lambda3 = (lambda3 * lambda3 * (lambda3 + lambda3 - A) + C) / (lambda3 * (2 * (lambda3 - A) + lambda3) + B); // this strange form prefers additions to multiplications
+		}
 
-	// ----------------------- //
-	// Use Rosetta for Veisq's //
-	// ----------------------- //
-	// denominators	  
-	PiDlambdaInv = 1 / (Dlambda31 * Dlambda32 * Dlambda21);
-	Xp3 = PiDlambdaInv * Dlambda21;
-	Xp2 = -PiDlambdaInv * Dlambda31;
+		// ------------------- //
+		// Get  Delta lambda's //
+		// ------------------- //
+		tmp = A - lambda3;
+		Dlambda21 = sqrt(tmp * tmp - 4 * C / lambda3);
+		lambda2 = 0.5 * (A - lambda3 + Dlambda21);
+		Dlambda32 = lambda3 - lambda2;
+		Dlambda31 = Dlambda32 + Dlambda21;
 
-	// numerators
-	Ue3sq = (lambda3 * (lambda3 - See) + Tee) * Xp3;
-	Ue2sq = (lambda2 * (lambda2 - See) + Tee) * Xp2;
+		// ----------------------- //
+		// Use Rosetta for Veisq's //
+		// ----------------------- //
+		// denominators	  
+		PiDlambdaInv = 1 / (Dlambda31 * Dlambda32 * Dlambda21);
+		Xp3 = PiDlambdaInv * Dlambda21;
+		Xp2 = -PiDlambdaInv * Dlambda31;
 
-	Smm = A - Dmsq21 * Um2sq - Dmsq31 * Um3sq;
-	Tmm = Tmm * (1 - Um3sq - Um2sq) + Amatter * (See + Smm - A);
+		// numerators
+		Ue3sq = (lambda3 * (lambda3 - See) + Tee) * Xp3;
+		Ue2sq = (lambda2 * (lambda2 - See) + Tee) * Xp2;
 
-	Um3sq = (lambda3 * (lambda3 - Smm) + Tmm) * Xp3;
-	Um2sq = (lambda2 * (lambda2 - Smm) + Tmm) * Xp2;
+		Smm = A - Dmsq21 * Um2sq_tmp - Dmsq31 * Um3sq_tmp;
+		Tmm = Tmm_tmp * (1 - Um3sq_tmp - Um2sq_tmp) + Amatter * (See + Smm - A);
 
-	// ------------- //
-	// Use NHS for J //
-	// ------------- //
-	Jmatter = Jmatter * Dmsq21 * Dmsq31 * (Dmsq31 - Dmsq21) * PiDlambdaInv;
+		Um3sq = (lambda3 * (lambda3 - Smm) + Tmm) * Xp3;
+		Um2sq = (lambda2 * (lambda2 - Smm) + Tmm) * Xp2;
 
-	// ----------------------- //
-	// Get all elements of Usq //
-	// ----------------------- //
-	Ue1sq = 1 - Ue3sq - Ue2sq;
-	Um1sq = 1 - Um3sq - Um2sq;
+		// ------------- //
+		// Use NHS for J //
+		// ------------- //
+		Jmatter = Jmatter_tmp * Dmsq21 * Dmsq31 * (Dmsq31 - Dmsq21) * PiDlambdaInv;
 
-	Ut3sq = 1 - Um3sq - Ue3sq;
-	Ut2sq = 1 - Um2sq - Ue2sq;
-	Ut1sq = 1 - Um1sq - Ue1sq;
+		// ----------------------- //
+		// Get all elements of Usq //
+		// ----------------------- //
+		Ue1sq = 1 - Ue3sq - Ue2sq;
+		Um1sq = 1 - Um3sq - Um2sq;
 
-	// ----------------------- //
-	// Get the kinematic terms //
-	// ----------------------- //
-	Lover4E = eVsqkm_to_GeV_over4 * L / E;
+		Ut3sq = 1 - Um3sq - Ue3sq;
+		Ut2sq = 1 - Um2sq - Ue2sq;
+		Ut1sq = 1 - Um1sq - Ue1sq;
 
-	D21 = Dlambda21 * Lover4E;
-	D32 = Dlambda32 * Lover4E;
-	  
-	sinD21 = sin(D21);
-	sinD31 = sin(D32 + D21);
-	sinD32 = sin(D32);
+		// ----------------------- //
+		// Get the kinematic terms //
+		// ----------------------- //
+		Lover4E = eVsqkm_to_GeV_over4 * L / E[i];
 
-	triple_sin = sinD21 * sinD31 * sinD32;
+		D21 = Dlambda21 * Lover4E;
+		D32 = Dlambda32 * Lover4E;
+		  
+		sinD21 = sin(D21);
+		sinD31 = sin(D32 + D21);
+		sinD32 = sin(D32);
 
-	sinsqD21_2 = 2 * sinD21 * sinD21;
-	sinsqD31_2 = 2 * sinD31 * sinD31;
-	sinsqD32_2 = 2 * sinD32 * sinD32;
+		triple_sin = sinD21 * sinD31 * sinD32;
 
-	// ------------------------------------------------------------------- //
-	// Calculate the three necessary probabilities, separating CPC and CPV //
-	// ------------------------------------------------------------------- //
-	Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
-			+ (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
-			+ (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
-	Pme_CPV = -Jmatter * triple_sin;
+		sinsqD21_2 = 2 * sinD21 * sinD21;
+		sinsqD31_2 = 2 * sinD31 * sinD31;
+		sinsqD32_2 = 2 * sinD32 * sinD32;
 
-	Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2
-				 + Um3sq * Um1sq * sinsqD31_2
-				 + Um3sq * Um2sq * sinsqD32_2);
+		// ------------------------------------------------------------------- //
+		// Calculate the three necessary probabilities, separating CPC and CPV //
+		// ------------------------------------------------------------------- //
+		Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
+				+ (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
+				+ (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
+		Pme_CPV = -Jmatter * triple_sin;
 
-	Pee = 1 - 2 * (Ue2sq * Ue1sq * sinsqD21_2
-				 + Ue3sq * Ue1sq * sinsqD31_2
-				 + Ue3sq * Ue2sq * sinsqD32_2);
+		Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2
+					 + Um3sq * Um1sq * sinsqD31_2
+					 + Um3sq * Um2sq * sinsqD32_2);
 
-	// ---------------------------- //
-	// Assign all the probabilities //
-	// ---------------------------- //
-	(*probs_returned)[0][0] = Pee;														// Pee
-	(*probs_returned)[0][1] = Pme_CPC - Pme_CPV;										// Pem
-	(*probs_returned)[0][2] = 1 - Pee - (*probs_returned)[0][1];  						// Pet
+		Pee = 1 - 2 * (Ue2sq * Ue1sq * sinsqD21_2
+					 + Ue3sq * Ue1sq * sinsqD31_2
+					 + Ue3sq * Ue2sq * sinsqD32_2);
 
-	(*probs_returned)[1][0] = Pme_CPC + Pme_CPV;										// Pme
-	(*probs_returned)[1][1] = Pmm;														// Pmm
-	(*probs_returned)[1][2] = 1 - (*probs_returned)[1][0] - Pmm;						// Pmt
+		// ---------------------------- //
+		// Assign all the probabilities //
+		// ---------------------------- //
+		(*probs_returned)[i][0][0] = Pee;															// Pee
+		(*probs_returned)[i][0][1] = Pme_CPC - Pme_CPV;												// Pem
+		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
 
-	(*probs_returned)[2][0] = 1 - Pee - (*probs_returned)[1][0];						// Pte
-	(*probs_returned)[2][1] = 1 - (*probs_returned)[0][1] - Pmm;						// Ptm
-	(*probs_returned)[2][2] = 1 - (*probs_returned)[0][2] - (*probs_returned)[1][2];	// Ptt
+		(*probs_returned)[i][1][0] = Pme_CPC + Pme_CPV;												// Pme
+		(*probs_returned)[i][1][1] = Pmm;															// Pmm
+		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
+
+		(*probs_returned)[i][2][0] = 1 - Pee - (*probs_returned)[i][1][0];							// Pte
+		(*probs_returned)[i][2][1] = 1 - (*probs_returned)[i][0][1] - Pmm;							// Ptm
+		(*probs_returned)[i][2][2] = 1 - (*probs_returned)[i][0][2] - (*probs_returned)[i][1][2];	// Ptt
+	} // i, energies
 }
 
-void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, double E, double (*probs_returned)[3][3])
+void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, vector<double[3][3]> *probs_returned)
 {
 	double c13sq, sind, cosd, Jrr, Jvac;
 	double Ue1sq, Ue2sq, Ue3sq, Um1sq, Um2sq, Um3sq, Ut1sq, Ut2sq, Ut3sq;
@@ -230,60 +239,66 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 	Ut2sq = 1 - Um2sq - Ue2sq;
 	Ut1sq = 1 - Um1sq - Ue1sq;
 
-	// ----------------------- //
-	// Get the kinematic terms //
-	// ----------------------- //
-	Lover4E = eVsqkm_to_GeV_over4 * L / E;
+	for (int i = 0; i < E.size(); i++)
+	{
+		// ----------------------- //
+		// Get the kinematic terms //
+		// ----------------------- //
+		Lover4E = eVsqkm_to_GeV_over4 * L / E[i];
 
-	D21 = Dmsq21 * Lover4E;
-	D31 = Dmsq31 * Lover4E;
-	  
-	sinD21 = sin(D21);
-	sinD31 = sin(D31);
-	sinD32 = sin(D31-D21);
+		D21 = Dmsq21 * Lover4E;
+		D31 = Dmsq31 * Lover4E;
+		  
+		sinD21 = sin(D21);
+		sinD31 = sin(D31);
+		sinD32 = sin(D31 - D21);
 
-	triple_sin = sinD21 * sinD31 * sinD32;
+		triple_sin = sinD21 * sinD31 * sinD32;
 
-	sinsqD21_2 = 2 * sinD21 * sinD21;
-	sinsqD31_2 = 2 * sinD31 * sinD31;
-	sinsqD32_2 = 2 * sinD32 * sinD32;
+		sinsqD21_2 = 2 * sinD21 * sinD21;
+		sinsqD31_2 = 2 * sinD31 * sinD31;
+		sinsqD32_2 = 2 * sinD32 * sinD32;
 
-	// ------------------------------------------------------------------- //
-	// Calculate the three necessary probabilities, separating CPC and CPV //
-	// ------------------------------------------------------------------- //
-	Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
-			+ (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
-			+ (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
-	
-	Pme_CPV = -Jvac * triple_sin;
+		// ------------------------------------------------------------------- //
+		// Calculate the three necessary probabilities, separating CPC and CPV //
+		// ------------------------------------------------------------------- //
+		Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
+				+ (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
+				+ (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
+		
+		Pme_CPV = -Jvac * triple_sin;
 
-	Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2
-				 + Um3sq * Um1sq * sinsqD31_2
-				 + Um3sq * Um2sq * sinsqD32_2);
+		Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2
+					 + Um3sq * Um1sq * sinsqD31_2
+					 + Um3sq * Um2sq * sinsqD32_2);
 
-	Pee = 1 - 2 * (Ue2sq * Ue1sq * sinsqD21_2
-				 + Ue3sq * Ue1sq * sinsqD31_2
-				 + Ue3sq * Ue2sq * sinsqD32_2);
+		Pee = 1 - 2 * (Ue2sq * Ue1sq * sinsqD21_2
+					 + Ue3sq * Ue1sq * sinsqD31_2
+					 + Ue3sq * Ue2sq * sinsqD32_2);
 
-	// ---------------------------- //
-	// Assign all the probabilities //
-	// ---------------------------- //
-	(*probs_returned)[0][0] = Pee;														// Pee
-	(*probs_returned)[0][1] = Pme_CPC - Pme_CPV;										// Pem
-	(*probs_returned)[0][2] = 1 - Pee - (*probs_returned)[0][1];  						// Pet
+		// ---------------------------- //
+		// Assign all the probabilities //
+		// ---------------------------- //
+		(*probs_returned)[i][0][0] = Pee;															// Pee
+		(*probs_returned)[i][0][1] = Pme_CPC - Pme_CPV;												// Pem
+		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
 
-	(*probs_returned)[1][0] = Pme_CPC + Pme_CPV;										// Pme
-	(*probs_returned)[1][1] = Pmm;														// Pmm
-	(*probs_returned)[1][2] = 1 - (*probs_returned)[1][0] - Pmm;						// Pmt
+		(*probs_returned)[i][1][0] = Pme_CPC + Pme_CPV;												// Pme
+		(*probs_returned)[i][1][1] = Pmm;															// Pmm
+		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
 
-	(*probs_returned)[2][0] = 1 - Pee - (*probs_returned)[1][0];						// Pte
-	(*probs_returned)[2][1] = 1 - (*probs_returned)[0][1] - Pmm;						// Ptm
-	(*probs_returned)[2][2] = 1 - (*probs_returned)[0][2] - (*probs_returned)[1][2];	// Ptt
+		(*probs_returned)[i][2][0] = 1 - Pee - (*probs_returned)[i][1][0];							// Pte
+		(*probs_returned)[i][2][1] = 1 - (*probs_returned)[i][0][1] - Pmm;							// Ptm
+		(*probs_returned)[i][2][2] = 1 - (*probs_returned)[i][0][2] - (*probs_returned)[i][1][2];	// Ptt
+	} // i, energies
 }
 
 int main()
 {
-	double L, E, rho, Ye, probs_returned[3][3];
+	int nE = 5;
+	double L, Emin, Emax, Estep, rhoYe;
+	vector<double> E(nE);
+	vector<double[3][3]> probs_returned(nE);
 	double s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31;
 	int N_Newton;
 
@@ -291,9 +306,12 @@ int main()
 	// Set the experimental parameters //
 	// ------------------------------- //
 	L = 1300; // km
-	E = 2.5; // GeV
-	rho = 3; // g/cc
-	Ye = 0.5;
+	Emin = 1; // GeV
+	Emax = 6; // GeV
+	Estep = (Emax - Emin) / nE; // GeV
+	for (int i = 0; i < nE; i++)
+		E[i] = Emin + i * Estep;
+	rhoYe = 3 * 0.5; // g/cc
 
 	// --------------------------------------------------------------------- //
 	// Set the number of Newton-Raphson iterations which sets the precision. //
@@ -316,20 +334,23 @@ int main()
 	// ------------------------------------------ //
 	// Calculate all 9 oscillations probabilities //
 	// ------------------------------------------ //
-	Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rho, Ye, N_Newton, &probs_returned);
+	Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, &probs_returned);
 
 	// --------------------------- //
 	// Print out the probabilities //
 	// --------------------------- //
-	printf("L = %g E = %g rho = %g\n", L, E, rho);
+	printf("L = %g (km), rhoYe = %g (g/cc)\n", L, rhoYe);
 	printf("Probabilities:\n");
-	printf("alpha beta P(nu_alpha -> nu_beta)\n");
-	for (int alpha = 0; alpha < 3; alpha++)
+	printf("alpha beta E P(nu_alpha -> nu_beta)\n");
+	for (int i = 0; i < nE; i++)
 	{
-		for (int beta = 0; beta < 3; beta++)
+		for (int alpha = 0; alpha < 3; alpha++)
 		{
-			printf("%d %d %g\n", alpha, beta, probs_returned[alpha][beta]);
-		} // beta, 3
-	} // alpha, 3
+			for (int beta = 0; beta < 3; beta++)
+			{
+				printf("%d %d %g %.12f\n", alpha, beta, E[i], probs_returned[i][alpha][beta]);
+			} // beta, 3
+		} // alpha, 3
+	} // i, nE, energy
 
 }
