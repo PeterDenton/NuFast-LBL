@@ -1,6 +1,0 @@
-#ifndef Page_H
-#define Page_H
-
-void Probability_Matter_LBL_Page(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, double E, double rho, double Ye, int empty, double (*probs_returned)[3][3]);
-
-#endif

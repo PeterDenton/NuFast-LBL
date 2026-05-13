@@ -1,7 +1,7 @@
 CXX=g++
 
-CFlags=-c -Wall -MMD -std=c++11
-#CFlags+=-Ofast -ffast-math # can improve speed by 10s of percent over the default of -O0
+CFlags=-c -Wall -MMD -std=c++17
+CFlags+=-Ofast -ffast-math # can improve speed by 10s of percent over the default of -O0
 
 Sources=$(wildcard src/*.cpp)
 IncludeDir=-I./include

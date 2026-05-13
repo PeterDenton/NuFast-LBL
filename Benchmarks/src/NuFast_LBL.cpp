@@ -1,34 +1,38 @@
 #include <cmath>
-#include <stdio.h>
-
 #include <vector>
+#include <array>
 
-using namespace std;
+#include "NuFast_LBL.h"
+#include "Benchmark.h"
 
-// Some constants
-constexpr double const eVsqkm_to_GeV_over4 = 1e-9 / 1.97327e-7 * 1e3 / 4;
-constexpr double const YerhoE2a = 1.52588e-4;
+using std::vector, std::array;
 
-// Probability_Matter_LBL calculates all nine oscillation probabilities including
-// the matter effect in an optimized, fast, and efficient way. The precision can
-// be controlled with N_Newton. For many applications N_Newton=0 may be enough,
-// but many years of DUNE or HK-LBL may require N_Newton=1. This code may be
-// suitable for atmospheric neutrinos. The code is standalone.
+namespace NuFast {
+
+
+// Probability_Matter_LBL calculates all nine oscillation probabilities across a
+// vector of energies, including the matter effect, in an optimized, fast, and
+// efficient way. The precision can be controlled with N_Newton. For many
+// applications N_Newton=0 will be enough, but many years of DUNE or HK-LBL may
+// require N_Newton=1 for a high precision nuerical scan. The code is standalone.
 //
 // Inputs:
 //   mixing angles (usual parameterization)
-//   phase (usual parameterization) make Dmsq31 positive/negative for the NO/IO
+//   phase (usual parameterization, radians)
 //   Delta msq's (eV^2)
+//   Make Dmsq31 positive/negative for the NO/IO
 //   L (km)
-//   nE: number of energy points to compute
-//   E (GeV) positive for neutrinos, negative for antineutrinos. Array
-//   rhoYe density (g/cc) times electron fraction, typically around 0.5
-//   Ye: electron fraction, typically around 0.5
-//   N_Newton: number of Newton's method iterations to do. should be zero, one, two (or higher); if negative, use exact expression
+//   E (GeV) positive for neutrinos, negative for antineutrinos. Vector
+//   rhoYe density (g/cc) times electron fraction, typically around 3 * 0.5 for the Earth's crust
+//   N_Newton: number of Newton's method iterations to do. Should be zero, one, two (can be higher); if it is negative, the code will use the exact expression
 // Outputs:
-//   probs_returned is all nine oscillation probabilities: e.g. probs_returned[1][0] is mu->e
-void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int N_Newton, vector<double[3][3]> *probs_returned)
+//   probs_returned: a vector (over energies) of all nine oscillation probabilities: e.g. probs_returned[i][1][0] is P(nu_mu->nu_e) for energy E[i]
+//     the vector should be allocated first
+void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int N_Newton, vector<array<array<double, 3>, 3>> *probs_returned)
 {
+	// ------------------------ //
+	// The variables to be used //
+	// ------------------------ //
 	double c13sq, sind, cosd, Jrr, Jmatter, Jmatter_tmp, Dmsqee, Amatter;
 	double Ue1sq, Ue2sq, Ue2sq_tmp, Ue3sq, Ue3sq_tmp, Um1sq, Um2sq, Um2sq_tmp, Um3sq, Um3sq_tmp,Ut1sq, Ut2sq, Ut2sq_tmp, Ut3sq;
 	double A, A_tmp, B, C;
@@ -39,18 +43,18 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	double Lover4E, D21, D32;
 	double sinD21, sinD31, sinD32;
 	double sinsqD21_2, sinsqD31_2, sinsqD32_2, triple_sin;
-	double Pme_CPC, Pme_CPV, Pmm, Pee;
+	double Pme_TC, Pme_TV, Pmm, Pee;
 
-	// --------------------------------------------------------------------- //
-	// First calculate useful simple functions of the oscillation parameters //
-	// --------------------------------------------------------------------- //
+	// ------------------------------------------------------------------------------------------------- //
+	// First calculate useful simple functions of the oscillation parameters that don't depend on energy //
+	// ------------------------------------------------------------------------------------------------- //
 	c13sq = 1 - s13sq;
 
 	// Ueisq's
 	Ue2sq_tmp = c13sq * s12sq;
 	Ue3sq_tmp = s13sq;
 
-	// Umisq's, Utisq's and Jvac	 
+	// Umisq's, Utisq's and Jvac
 	Um3sq_tmp = c13sq * s23sq;
 	// Um2sq_tmp and Ut2sq_tmp are used here as temporary variables, will be properly defined later	 
 	Ut2sq_tmp = s13sq * s12sq * s23sq;
@@ -70,19 +74,22 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	Tmm_tmp = Dmsq21 * Dmsq31; // using Tmm as a temporary variable	  
 	Tee = Tmm_tmp * (1 - Ue3sq_tmp - Ue2sq_tmp);
 
-	for (int i = 0; i < E.size(); i++)
+	// --------------------------- //
+	// Loop over the energy vector //
+	// --------------------------- //
+	for (unsigned int i = 0; i < E.size(); i++)
 	{
 		Amatter = rhoYe * E[i] * YerhoE2a;
 		C = Amatter * Tee;
 		A = A_tmp + Amatter;
+		B = Tmm_tmp + Amatter * See; // B is not needed for N_Newton=0, but we calculate it everytime anyway
 
 		if (N_Newton < 0)
 		{
-			// ------------------------------------------- //
-			// Get lambda3 from ZS, computationally costly //
-			// Lambda3 for both mass orderings             //
-			// ------------------------------------------- //
-			B = Tmm_tmp + Amatter * See; // B is only needed for N_Newton != 1
+			// --------------------------------------------------------- //
+			// Get lambda3 from exact expression, computationally costly //
+			// Lambda3 for both mass orderings                           //
+			// --------------------------------------------------------- //
 			rootAsqB = sqrt(A * A - 3. * B);
 			ss0 = acos((A * A * A - 4.5 * A * B + 13.5 * C) / (rootAsqB * rootAsqB * rootAsqB));
 			if (Dmsq31 < 0.)
@@ -101,7 +108,6 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 			// ---------------------------------------------------------------------------- //
 			// Newton iterations to improve lambda3 arbitrarily, if needed, (B needed here) //
 			// ---------------------------------------------------------------------------- //
-			B = Tmm_tmp + Amatter * See; // B is only needed for N_Newton != 1
 			for (int j = 0; j < N_Newton; j++)
 				lambda3 = (lambda3 * lambda3 * (lambda3 + lambda3 - A) + C) / (lambda3 * (2 * (lambda3 - A) + lambda3) + B); // this strange form prefers additions to multiplications
 		}
@@ -138,9 +144,9 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 		// ------------- //
 		Jmatter = Jmatter_tmp * Dmsq21 * Dmsq31 * (Dmsq31 - Dmsq21) * PiDlambdaInv;
 
-		// ----------------------- //
-		// Get all elements of Usq //
-		// ----------------------- //
+		// --------------------------------- //
+		// Get all elements of Usq in matter //
+		// --------------------------------- //
 		Ue1sq = 1 - Ue3sq - Ue2sq;
 		Um1sq = 1 - Um3sq - Um2sq;
 
@@ -166,13 +172,13 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 		sinsqD31_2 = 2 * sinD31 * sinD31;
 		sinsqD32_2 = 2 * sinD32 * sinD32;
 
-		// ------------------------------------------------------------------- //
-		// Calculate the three necessary probabilities, separating CPC and CPV //
-		// ------------------------------------------------------------------- //
-		Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
-				+ (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
-				+ (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
-		Pme_CPV = -Jmatter * triple_sin;
+		// ----------------------------------------------------------------- //
+		// Calculate the three necessary probabilities, separating TC and TV //
+		// ----------------------------------------------------------------- //
+		Pme_TC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
+			   + (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
+			   + (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
+		Pme_TV = -Jmatter * triple_sin;
 
 		Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2
 					 + Um3sq * Um1sq * sinsqD31_2
@@ -186,10 +192,10 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 		// Assign all the probabilities //
 		// ---------------------------- //
 		(*probs_returned)[i][0][0] = Pee;															// Pee
-		(*probs_returned)[i][0][1] = Pme_CPC - Pme_CPV;												// Pem
+		(*probs_returned)[i][0][1] = Pme_TC - Pme_TV;												// Pem
 		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
 
-		(*probs_returned)[i][1][0] = Pme_CPC + Pme_CPV;												// Pme
+		(*probs_returned)[i][1][0] = Pme_TC + Pme_TV;												// Pme
 		(*probs_returned)[i][1][1] = Pmm;															// Pmm
 		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
 
@@ -199,18 +205,18 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 	} // i, energies
 }
 
-void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, vector<double[3][3]> *probs_returned)
+void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double empty1, int empty2, vector<array<array<double, 3>, 3>> *probs_returned)
 {
 	double c13sq, sind, cosd, Jrr, Jvac;
 	double Ue1sq, Ue2sq, Ue3sq, Um1sq, Um2sq, Um3sq, Ut1sq, Ut2sq, Ut3sq;
 	double Lover4E, D21, D31;
 	double sinD21, sinD31, sinD32;
 	double sinsqD21_2, sinsqD31_2, sinsqD32_2, triple_sin;
-	double Pme_CPC, Pme_CPV, Pmm, Pee;
+	double Pme_TC, Pme_TV, Pmm, Pee;
 
-	// --------------------------------------------------------------------- //
-	// First calculate useful simple functions of the oscillation parameters //
-	// --------------------------------------------------------------------- //
+	// ------------------------------------------------------------------------------------------------- //
+	// First calculate useful simple functions of the oscillation parameters that don't depend on energy //
+	// ------------------------------------------------------------------------------------------------- //
 	c13sq = 1 - s13sq;
 
 	// Ueisq's
@@ -239,7 +245,10 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 	Ut2sq = 1 - Um2sq - Ue2sq;
 	Ut1sq = 1 - Um1sq - Ue1sq;
 
-	for (int i = 0; i < E.size(); i++)
+	// --------------------------- //
+	// Loop over the energy vector //
+	// --------------------------- //
+	for (unsigned int i = 0; i < E.size(); i++)
 	{
 		// ----------------------- //
 		// Get the kinematic terms //
@@ -259,14 +268,14 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 		sinsqD31_2 = 2 * sinD31 * sinD31;
 		sinsqD32_2 = 2 * sinD32 * sinD32;
 
-		// ------------------------------------------------------------------- //
-		// Calculate the three necessary probabilities, separating CPC and CPV //
-		// ------------------------------------------------------------------- //
-		Pme_CPC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
-				+ (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
-				+ (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
+		// ----------------------------------------------------------------- //
+		// Calculate the three necessary probabilities, separating TC and TV //
+		// ----------------------------------------------------------------- //
+		Pme_TC = (Ut3sq - Um2sq * Ue1sq - Um1sq * Ue2sq) * sinsqD21_2
+			   + (Ut2sq - Um3sq * Ue1sq - Um1sq * Ue3sq) * sinsqD31_2
+			   + (Ut1sq - Um3sq * Ue2sq - Um2sq * Ue3sq) * sinsqD32_2;
 		
-		Pme_CPV = -Jvac * triple_sin;
+		Pme_TV = -Jvac * triple_sin;
 
 		Pmm = 1 - 2 * (Um2sq * Um1sq * sinsqD21_2
 					 + Um3sq * Um1sq * sinsqD31_2
@@ -280,10 +289,10 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 		// Assign all the probabilities //
 		// ---------------------------- //
 		(*probs_returned)[i][0][0] = Pee;															// Pee
-		(*probs_returned)[i][0][1] = Pme_CPC - Pme_CPV;												// Pem
+		(*probs_returned)[i][0][1] = Pme_TC - Pme_TV;												// Pem
 		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
 
-		(*probs_returned)[i][1][0] = Pme_CPC + Pme_CPV;												// Pme
+		(*probs_returned)[i][1][0] = Pme_TC + Pme_TV;												// Pme
 		(*probs_returned)[i][1][1] = Pmm;															// Pmm
 		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
 
@@ -292,65 +301,4 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 		(*probs_returned)[i][2][2] = 1 - (*probs_returned)[i][0][2] - (*probs_returned)[i][1][2];	// Ptt
 	} // i, energies
 }
-
-int main()
-{
-	int nE = 5;
-	double L, Emin, Emax, Estep, rhoYe;
-	vector<double> E(nE);
-	vector<double[3][3]> probs_returned(nE);
-	double s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31;
-	int N_Newton;
-
-	// ------------------------------- //
-	// Set the experimental parameters //
-	// ------------------------------- //
-	L = 1300; // km
-	Emin = 1; // GeV
-	Emax = 6; // GeV
-	Estep = (Emax - Emin) / nE; // GeV
-	for (int i = 0; i < nE; i++)
-		E[i] = Emin + i * Estep;
-	rhoYe = 3 * 0.5; // g/cc
-
-	// --------------------------------------------------------------------- //
-	// Set the number of Newton-Raphson iterations which sets the precision. //
-	// 0 is close to the single precision limit and is better than DUNE/HK   //
-	// in the high statistics regime. Increasing N_Newton to 1,2,... rapidly //
-	// improves the precision at a modest computational cost                 //
-	// --------------------------------------------------------------------- //
-	N_Newton = 0;
-
-	// ------------------------------------- //
-	// Set the vacuum oscillation parameters //
-	// ------------------------------------- //
-	s12sq = 0.31;
-	s13sq = 0.02;
-	s23sq = 0.55;
-	delta = 0.7 * M_PI;
-	Dmsq21 = 7.5e-5; // eV^2
-	Dmsq31 = 2.5e-3; // eV^2
-
-	// ------------------------------------------ //
-	// Calculate all 9 oscillations probabilities //
-	// ------------------------------------------ //
-	Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, &probs_returned);
-
-	// --------------------------- //
-	// Print out the probabilities //
-	// --------------------------- //
-	printf("L = %g (km), rhoYe = %g (g/cc)\n", L, rhoYe);
-	printf("Probabilities:\n");
-	printf("alpha beta E P(nu_alpha -> nu_beta)\n");
-	for (int i = 0; i < nE; i++)
-	{
-		for (int alpha = 0; alpha < 3; alpha++)
-		{
-			for (int beta = 0; beta < 3; beta++)
-			{
-				printf("%d %d %g %.12f\n", alpha, beta, E[i], probs_returned[i][alpha][beta]);
-			} // beta, 3
-		} // alpha, 3
-	} // i, nE, energy
-
-}
+} // namespace NuFast
