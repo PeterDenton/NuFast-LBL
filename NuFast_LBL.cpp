@@ -29,7 +29,7 @@ constexpr double const YerhoE2a = 1.52588e-4;
 // Outputs:
 //   probs_returned: a vector (over energies) of all nine oscillation probabilities: e.g. probs_returned[i][1][0] is P(nu_mu->nu_e) for energy E[i]
 //     the vector should be allocated first
-void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int N_Newton, vector<array<array<double, 3>, 3>> *probs_returned)
+void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, const vector<double> &E, double rhoYe, int N_Newton, vector<array<array<double, 3>, 3>> &probs_returned)
 {
 	// ------------------------ //
 	// The variables to be used //
@@ -192,21 +192,21 @@ void Probability_Matter_LBL(double s12sq, double s13sq, double s23sq, double del
 		// ---------------------------- //
 		// Assign all the probabilities //
 		// ---------------------------- //
-		(*probs_returned)[i][0][0] = Pee;															// Pee
-		(*probs_returned)[i][0][1] = Pme_TC - Pme_TV;												// Pem
-		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
+		probs_returned[i][0][0] = Pee;														// Pee
+		probs_returned[i][0][1] = Pme_TC - Pme_TV;											// Pem
+		probs_returned[i][0][2] = 1 - Pee - probs_returned[i][0][1];  						// Pet
 
-		(*probs_returned)[i][1][0] = Pme_TC + Pme_TV;												// Pme
-		(*probs_returned)[i][1][1] = Pmm;															// Pmm
-		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
+		probs_returned[i][1][0] = Pme_TC + Pme_TV;											// Pme
+		probs_returned[i][1][1] = Pmm;														// Pmm
+		probs_returned[i][1][2] = 1 - probs_returned[i][1][0] - Pmm;						// Pmt
 
-		(*probs_returned)[i][2][0] = 1 - Pee - (*probs_returned)[i][1][0];							// Pte
-		(*probs_returned)[i][2][1] = 1 - (*probs_returned)[i][0][1] - Pmm;							// Ptm
-		(*probs_returned)[i][2][2] = 1 - (*probs_returned)[i][0][2] - (*probs_returned)[i][1][2];	// Ptt
+		probs_returned[i][2][0] = 1 - Pee - probs_returned[i][1][0];						// Pte
+		probs_returned[i][2][1] = 1 - probs_returned[i][0][1] - Pmm;						// Ptm
+		probs_returned[i][2][2] = 1 - probs_returned[i][0][2] - probs_returned[i][1][2];	// Ptt
 	} // i, energies
 }
 
-void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, vector<array<array<double, 3>, 3>> *probs_returned)
+void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, const vector<double> &E, vector<array<array<double, 3>, 3>> &probs_returned)
 {
 	double c13sq, sind, cosd, Jrr, Jvac;
 	double Ue1sq, Ue2sq, Ue3sq, Um1sq, Um2sq, Um3sq, Ut1sq, Ut2sq, Ut3sq;
@@ -289,17 +289,17 @@ void Probability_Vacuum_LBL(double s12sq, double s13sq, double s23sq, double del
 		// ---------------------------- //
 		// Assign all the probabilities //
 		// ---------------------------- //
-		(*probs_returned)[i][0][0] = Pee;															// Pee
-		(*probs_returned)[i][0][1] = Pme_TC - Pme_TV;												// Pem
-		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
+		probs_returned[i][0][0] = Pee;														// Pee
+		probs_returned[i][0][1] = Pme_TC - Pme_TV;											// Pem
+		probs_returned[i][0][2] = 1 - Pee - probs_returned[i][0][1];  						// Pet
 
-		(*probs_returned)[i][1][0] = Pme_TC + Pme_TV;												// Pme
-		(*probs_returned)[i][1][1] = Pmm;															// Pmm
-		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
+		probs_returned[i][1][0] = Pme_TC + Pme_TV;											// Pme
+		probs_returned[i][1][1] = Pmm;														// Pmm
+		probs_returned[i][1][2] = 1 - probs_returned[i][1][0] - Pmm;						// Pmt
 
-		(*probs_returned)[i][2][0] = 1 - Pee - (*probs_returned)[i][1][0];							// Pte
-		(*probs_returned)[i][2][1] = 1 - (*probs_returned)[i][0][1] - Pmm;							// Ptm
-		(*probs_returned)[i][2][2] = 1 - (*probs_returned)[i][0][2] - (*probs_returned)[i][1][2];	// Ptt
+		probs_returned[i][2][0] = 1 - Pee - probs_returned[i][1][0];						// Pte
+		probs_returned[i][2][1] = 1 - probs_returned[i][0][1] - Pmm;						// Ptm
+		probs_returned[i][2][2] = 1 - probs_returned[i][0][2] - probs_returned[i][1][2];	// Ptt
 	} // i, energies
 }
 } // namespace NuFast
@@ -346,7 +346,7 @@ int main()
 	// ----------------------------------------------------------- //
 	// Calculate all 9 oscillations probabilities for all energies //
 	// ----------------------------------------------------------- //
-	NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, &probs_returned);
+	NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, probs_returned);
 
 	// --------------------------- //
 	// Print out the probabilities //

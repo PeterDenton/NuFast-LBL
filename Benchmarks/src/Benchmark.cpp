@@ -19,7 +19,7 @@ double const oneThird = 1. / 3;
 
 // Compute the speed for nE energies, n times, and then calculate the mean over those n*nE probabilities
 // N_Newton is used for NuFast only, ignored otherwise
-double Speed_Helper(void Probability_Calculator(double, double, double, double, double, double, double, vector<double>, double, int, vector<array<array<double, 3>, 3>> *probs_returned), int n, int nE, int N_Newton)
+double Speed_Helper(void Probability_Calculator(double, double, double, double, double, double, double, const vector<double> &, double, int, vector<array<array<double, 3>, 3>> &probs_returned), int n, int nE, int N_Newton)
 {
 	double s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, Emin, Emax, Estep, rhoYe;
 	vector<double> E(nE);
@@ -49,7 +49,7 @@ double Speed_Helper(void Probability_Calculator(double, double, double, double, 
 	std::chrono::high_resolution_clock::time_point start_time = std::chrono::high_resolution_clock::now();
 	for (int i = 0; i < n; i++)
 	{
-		Probability_Calculator(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, &probs_returned);
+		Probability_Calculator(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, probs_returned);
 	} // i, E, n
 	std::chrono::high_resolution_clock::time_point end_time = std::chrono::high_resolution_clock::now();
 	return std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time).count() / (n * nE);
@@ -58,7 +58,7 @@ double Speed_Helper(void Probability_Calculator(double, double, double, double, 
 // Compute the speed many times and calculate the mean and standard deviation
 // m is outer loop, n, is inner loop, nE is number of energy points
 // N_Newton is used for NuFast only, ignored otherwise
-void Speed(void Probability_Calculator(double, double, double, double, double, double, double, vector<double>, double, int, vector<array<array<double, 3>, 3>> *probs_returned), int m, int n, int nE, int N_Newton, double &mean, double &std)
+void Speed(void Probability_Calculator(double, double, double, double, double, double, double, const vector<double> &, double, int, vector<array<array<double, 3>, 3>> &probs_returned), int m, int n, int nE, int N_Newton, double &mean, double &std)
 {
 	double s, speed_sum, speedsq_sum;
 
@@ -109,9 +109,9 @@ int main()
 //	probs_returned_NuFast[0].resize(E.size());
 	for (unsigned int i = 0; i < E.size(); i++)
 		probs_returned_NuFast[0].emplace_back();
-	NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, &probs_returned_NuFast[0]);
+	NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, N_Newton, probs_returned_NuFast[0]);
 	probs_returned_Exact_Cubic.resize(E.size());
-	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, &probs_returned_Exact_Cubic);
+	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, probs_returned_Exact_Cubic);
 
 	// ------------------------------- //
 	// Print out the fractional errors //
@@ -139,13 +139,13 @@ int main()
 	for (int i = 0; i <= nE; i++)
 		E[i] = Emin + i * Estep;
 	probs_returned_Exact_Cubic.resize(E.size());
-	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, &probs_returned_Exact_Cubic);
+	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, probs_returned_Exact_Cubic);
 	probs_returned_DMP.resize(E.size());
-	Probability_Matter_LBL_DMP(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, &probs_returned_DMP);
+	Probability_Matter_LBL_DMP(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, probs_returned_DMP);
 	for (int j = 0; j < 2; j++)
 	{
 		probs_returned_NuFast[j].resize(E.size());
-		NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, j, &probs_returned_NuFast[j]);
+		NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, j, probs_returned_NuFast[j]);
 	} // j, N_Newton, 2
 	FILE *dataf = fopen("data/Precision_DUNE.txt", "w");
 	fprintf(dataf, "%g %g\n", L, rhoYe);
@@ -169,9 +169,9 @@ int main()
 	Estep = (Emax - Emin) / nE;
 	for (int i = 0; i <= nE; i++)
 		E[i] = Emin + i * Estep;
-	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, &probs_returned_Exact_Cubic);
+	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, probs_returned_Exact_Cubic);
 	for (int j = 0; j < 2; j++) // j, N_Newton
-		NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, j, &probs_returned_NuFast[j]);
+		NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, j, probs_returned_NuFast[j]);
 	dataf = fopen("data/Precision_HK.txt", "w");
 	fprintf(dataf, "%g %g\n", L, rhoYe);
 	for (int i = 0; i <= nE; i++)
@@ -195,9 +195,9 @@ int main()
 	Estep = (Emax - Emin) / nE;
 	for (int i = 0; i <= nE; i++)
 		E[i] = Emin + i * Estep;
-	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, &probs_returned_Exact_Cubic);
+	Probability_Matter_LBL_Exact_Cubic(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, 0, probs_returned_Exact_Cubic);
 	for (int j = 0; j < 2; j++) // j, N_Newton
-		NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, j, &probs_returned_NuFast[j]);
+		NuFast::Probability_Matter_LBL(s12sq, s13sq, s23sq, delta, Dmsq21, Dmsq31, L, E, rhoYe, j, probs_returned_NuFast[j]);
 	dataf = fopen("data/Precision_JUNO.txt", "w");
 	fprintf(dataf, "%g %g %d\n", L, rhoYe, N_Newton);
 	for (int i = 0; i <= nE; i++)
@@ -247,8 +247,8 @@ int main()
 		// Page's algorithm from 2309.06900
 		printf("Page (7/7)\n");
 		Speed(Probability_Matter_LBL_Page, m, n, nE, 0, mean, std);
-		printf("%g +- %g ns\n", mean, std);
-		fprintf(dataf, "Page %g += %g ns\n", mean, std);
+		printf("%g +- %g ns\n\n", mean, std);
+		fprintf(dataf, "Page %g += %g ns\n\n", mean, std);
 	} // i, nE
 
 	fclose(dataf);

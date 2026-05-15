@@ -7,7 +7,7 @@
 
 using std::vector, std::array;
 
-void Probability_Matter_LBL_Exact_Cubic(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int empty, vector<array<array<double, 3>, 3>> *probs_returned)
+void Probability_Matter_LBL_Exact_Cubic(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, const vector<double> &E, double rhoYe, int empty, vector<array<array<double, 3>, 3>> &probs_returned)
 {
     double Amatter, c13sq, sind, cosd;
 
@@ -143,16 +143,16 @@ void Probability_Matter_LBL_Exact_Cubic(double s12sq, double s13sq, double s23sq
 		// ---------------------------- //
 		// Assign all the probabilities //
 		// ---------------------------- //
-		(*probs_returned)[i][0][0] = Pee;															// Pee
-		(*probs_returned)[i][0][1] = Pme_CPC - Pme_CPV;												// Pem
-		(*probs_returned)[i][0][2] = 1 - Pee - (*probs_returned)[i][0][1];  						// Pet
+		probs_returned[i][0][0] = Pee;														// Pee
+		probs_returned[i][0][1] = Pme_CPC - Pme_CPV;										// Pem
+		probs_returned[i][0][2] = 1 - Pee - probs_returned[i][0][1];  						// Pet
 
-		(*probs_returned)[i][1][0] = Pme_CPC + Pme_CPV;												// Pme
-		(*probs_returned)[i][1][1] = Pmm;															// Pmm
-		(*probs_returned)[i][1][2] = 1 - (*probs_returned)[i][1][0] - Pmm;							// Pmt
+		probs_returned[i][1][0] = Pme_CPC + Pme_CPV;										// Pme
+		probs_returned[i][1][1] = Pmm;														// Pmm
+		probs_returned[i][1][2] = 1 - probs_returned[i][1][0] - Pmm;						// Pmt
 
-		(*probs_returned)[i][2][0] = 1 - Pee - (*probs_returned)[i][1][0];							// Pte
-		(*probs_returned)[i][2][1] = 1 - (*probs_returned)[i][0][1] - Pmm;							// Ptm
-		(*probs_returned)[i][2][2] = 1 - (*probs_returned)[i][0][2] - (*probs_returned)[i][1][2];	// Ptt
+		probs_returned[i][2][0] = 1 - Pee - probs_returned[i][1][0];						// Pte
+		probs_returned[i][2][1] = 1 - probs_returned[i][0][1] - Pmm;						// Ptm
+		probs_returned[i][2][2] = 1 - probs_returned[i][0][2] - probs_returned[i][1][2];	// Ptt
 	} // i, energies
 }

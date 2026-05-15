@@ -10,7 +10,7 @@ using std::vector, std::array;
 #define sq(x) ((x)*(x))
 #define cube(x) ((x)*(x)*(x))
 
-void Probability_Matter_LBL_Page(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int empty, vector<array<array<double, 3>, 3>> *probs_returned)
+void Probability_Matter_LBL_Page(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, const vector<double> &E, double rhoYe, int empty, vector<array<array<double, 3>, 3>> &probs_returned)
 {
 
 	// compute trig functions of mixing angles
@@ -99,11 +99,11 @@ void Probability_Matter_LBL_Page(double s12sq, double s13sq, double s23sq, doubl
 		Y_ee = Y_ee_tilde + 2 * H_ee_tilde * a + 2 * sq(a);
 		for (int j = 0; j < 3; j++)
 			X_ee[j] = 1 + (eigen[j] * H_ee + Y_ee) / (sq(eigen[j]) - a1); // pull out a 3 here, becomes a 9 later
-		(*probs_returned)[i][0][0] = 1. - 4 * (X_ee[1] * X_ee[0] * sq(sin(Theta_10))
+		probs_returned[i][0][0] = 1. - 4 * (X_ee[1] * X_ee[0] * sq(sin(Theta_10))
 										  + X_ee[2] * X_ee[0] * sq(sin(Theta_20))
 										  + X_ee[2] * X_ee[1] * sq(sin(Theta_21))) / 9.;
 
-		(*probs_returned)[i][1][0] = Pme_CPC + Pme_CPV;
+		probs_returned[i][1][0] = Pme_CPC + Pme_CPV;
 
 		// mu->mu
 		double H_mm_tilde, H_mm, Y_mm_tilde, Y_mm, X_mm[3];
@@ -113,17 +113,17 @@ void Probability_Matter_LBL_Page(double s12sq, double s13sq, double s23sq, doubl
 		Y_mm = Y_mm_tilde - 2 * (H_ee_tilde + H_mm_tilde) * a - sq(a);
 		for (int j = 0; j < 3; j++)
 			X_mm[j] = 1 + (eigen[j] * H_mm + Y_mm) / (sq(eigen[j]) - a1); // pull out a 3 here, becomes a 9 later
-		(*probs_returned)[i][1][1] = 1. - 4 * (X_mm[1] * X_mm[0] * sq(sin(Theta_10))
+		probs_returned[i][1][1] = 1. - 4 * (X_mm[1] * X_mm[0] * sq(sin(Theta_10))
 										  + X_mm[2] * X_mm[0] * sq(sin(Theta_20))
 										  + X_mm[2] * X_mm[1] * sq(sin(Theta_21))) / 9.;
 
 
-		(*probs_returned)[i][2][0] = 1. - (*probs_returned)[i][1][0] - (*probs_returned)[i][0][0]; // tau->e
-		(*probs_returned)[i][0][1] = Pme_CPC - Pme_CPV; // e->mu
-		(*probs_returned)[i][0][2] = 1. - (*probs_returned)[i][0][0] - (*probs_returned)[i][0][1]; // e->tau
-		(*probs_returned)[i][1][2] = 1. - (*probs_returned)[i][1][0] - (*probs_returned)[i][1][1]; // mu->tau
-		(*probs_returned)[i][2][1] = 1. - (*probs_returned)[i][0][1] - (*probs_returned)[i][1][1]; // tau->mu
-		(*probs_returned)[i][2][2] = 1. - (*probs_returned)[i][2][0] - (*probs_returned)[i][2][1]; // tau->tau
+		probs_returned[i][2][0] = 1. - probs_returned[i][1][0] - probs_returned[i][0][0]; // tau->e
+		probs_returned[i][0][1] = Pme_CPC - Pme_CPV; // e->mu
+		probs_returned[i][0][2] = 1. - probs_returned[i][0][0] - probs_returned[i][0][1]; // e->tau
+		probs_returned[i][1][2] = 1. - probs_returned[i][1][0] - probs_returned[i][1][1]; // mu->tau
+		probs_returned[i][2][1] = 1. - probs_returned[i][0][1] - probs_returned[i][1][1]; // tau->mu
+		probs_returned[i][2][2] = 1. - probs_returned[i][2][0] - probs_returned[i][2][1]; // tau->tau
 	} // i, energies
 }
 

@@ -9,7 +9,7 @@ using std::vector, std::array;
 
 #define sq(x) ((x)*(x))
 
-void Probability_Matter_LBL_DMP(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, vector<double> E, double rhoYe, int empty, vector<array<array<double, 3>, 3>> *probs_returned)
+void Probability_Matter_LBL_DMP(double s12sq, double s13sq, double s23sq, double delta, double Dmsq21, double Dmsq31, double L, const vector<double> &E, double rhoYe, int empty, vector<array<array<double, 3>, 3>> &probs_returned)
 {
 	double Dmsqeea, c2phi, a12, cphisq, sphisq, s2phi, cphi13sq, Dl21, c2psi, cpsisq, spsisq, Dl31, L4E, Delta21, Delta31, Delta32, sDelta21, sDelta31, sDelta32, dab, Jrm, C31, C32, C21, D, tmp;
 
@@ -71,7 +71,7 @@ void Probability_Matter_LBL_DMP(double s12sq, double s13sq, double s23sq, double
 		C32 = s23sq * sphisq * cphisq * spsisq - Jrm * cd;
 		C21 = cphisq * spsisq * cpsisq * (c23sq - sphisq * s23sq) + Jrm * cd * c2psi;
 		D = -Jrm * sd;
-		(*probs_returned)[i][1][0] = dab + 4 * (C31 * sq(sDelta31) + C32 * sq(sDelta32) + C21 * sq(sDelta21)) + 8 * D * sDelta21 * sDelta31 * sDelta32;
+		probs_returned[i][1][0] = dab + 4 * (C31 * sq(sDelta31) + C32 * sq(sDelta32) + C21 * sq(sDelta21)) + 8 * D * sDelta21 * sDelta31 * sDelta32;
 
 		// Pmm
 		dab = 1;
@@ -79,6 +79,6 @@ void Probability_Matter_LBL_DMP(double s12sq, double s13sq, double s23sq, double
 		C32 = -cphisq * s23sq * (c23sq * cpsisq + s23sq * sphisq * spsisq) + 2 * s23sq * Jrm * cd;
 		C21 = -(c23sq * cpsisq + s23sq * sphisq * spsisq) * (c23sq * spsisq + s23sq * sphisq * cpsisq) - 2 * (c23sq - sphisq * s23sq) * c2psi * Jrrm * cd + sq(2 * Jrrm * cd);
 		D = 0;
-		(*probs_returned)[i][1][1] = dab + 4 * (C31 * sq(sDelta31) + C32 * sq(sDelta32) + C21 * sq(sDelta21)) + 8 * D * sDelta21 * sDelta31 * sDelta32; // me
+		probs_returned[i][1][1] = dab + 4 * (C31 * sq(sDelta31) + C32 * sq(sDelta32) + C21 * sq(sDelta21)) + 8 * D * sDelta21 * sDelta31 * sDelta32; // me
 	} // i, energies
 }
